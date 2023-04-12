@@ -27,7 +27,7 @@ XBee xbeeBrac = XBee(); // setting up XBee object
 SparkFun_Bio_Sensor_Hub bioHub(resPin, mfioPin); 
 bioData body; 
 
-uint8_t payload[] = { 0, 0, 0, 0, 0 }; // {heart rate (whole number), blood ox (whole number?), body temp tens-ones, body temp tenths, emergency status (0 or 1)}
+uint8_t payload[] = { 0, 0, 0, 0, 0, 0 }; // {heart rate (whole number), blood ox (whole number?), body temp tens-ones, body temp tenths, emergency status (0 or 1)}
 uint8_t updates[] = { 0, 0, 0, 0, 0, 0 };
 
 // SH and SL address of coordinator (receiving)
@@ -50,13 +50,14 @@ void setup() {
    // receiving/setup of antenna goes BEFORE millis call, to ensure upon startup it starts on 60 seconds
    xbeeBrac.setSerial(Serial2);
    // Transmit packet to coordinator to initiate handshake
-   receive(); // receives thresholds if there are any
+   transmit(0);
+   receiveThres(); // receives thresholds if there are any
    startTime = millis(); // gets initial start time
    Serial.println("Clock setup complete");
 }
 
 void loop() {
-  // Take vital measurements with sensors
+   //Take vital measurements with sensors
     body = bioHub.readBpm();
     hRateMeas = getHeartRate();
     bloodOxMeas = getBloodOx();
@@ -81,7 +82,7 @@ void loop() {
 
 int transmit(int emergFlag) {
   int txSuccess = 0; // return value, is 0 if XBee success
-  payload[4] = (char)emergFlag; // set emergency flag in payload to input
+  payload[5] = (char)emergFlag; // set emergency flag in payload to input
   xbeeBrac.send(zbTx); // sends payload to XBee for transmission
 
   if (xbeeBrac.readPacket(500)) {
@@ -110,6 +111,7 @@ void receiveThres() {
     for (int i = 0; i < sizeof(updates); i++) {
       if (updates[i] != 0) {
         updateThres(updates[i], i);
+        
       }
     }
   }
@@ -120,7 +122,6 @@ void updateThres(int newValue, int type) {
   switch (type) {
     case 0:
       hRateLower = newValue;
-      Serial.println(hRateLower);
       break;
     case 1:
       hRateUpper = newValue;
@@ -152,18 +153,12 @@ void checkVitals() {
   payload[3] = bodyTempMeasTenth;
   
   if (hRateMeas < hRateLower || hRateMeas > hRateUpper) {
-    Serial.println(hRateLower);
-    Serial.println(hRateUpper);
     transmit(1);
   }
   else if (bloodOxMeas < bloodOxLower || bloodOxMeas > bloodOxUpper) {
-    Serial.println("Emerg 2");
     transmit(1);
   }
   else if (bodyTempMeas < bodyTempLower || bodyTempMeas > bodyTempUpper) {
-    Serial.println(bodyTempMeas);
-    Serial.println(bodyTempLower);
-    Serial.println(bodyTempUpper);
     transmit(1);
   }
 }
@@ -183,7 +178,7 @@ int receive() {
         Serial.println("No ACK?");
       }
       for (int i = 0; i < rx.getDataLength(); i++) {
-        Serial.print((char)rx.getData(i));
+ //       Serial.print((char)rx.getData(i));
         updates[i] = rx.getData(i);
       }
       Serial.println();
